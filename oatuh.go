@@ -1,4 +1,4 @@
-package tvbgoScanLoginGoSdk
+package tvbgo
 
 import (
 	"context"
@@ -140,6 +140,7 @@ type TvbGoAccessToken struct {
 	ExpiresIn    int    `json:"expires_in"`
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
+	Openid       string `json:"openid"` // 在 client_id 維度全局唯一
 }
 
 // TvbGoUserInfo TvbGo oauth user info

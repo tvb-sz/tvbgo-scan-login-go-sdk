@@ -1,4 +1,4 @@
-package tvbgoScanLoginGoSdk
+package tvbgo
 
 import (
 	"bytes"
