@@ -7,8 +7,42 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
+
+const (
+	// HostProd 生產環境
+	HostProd = "https://api.tvbgo.tvb.com"
+	// HostQA QA 環境
+	HostQA = "https://qa-api.tvbgo.tvb.com"
+	// HostDev 開發環境
+	HostDev = "https://mytvb.tvb-sz.com"
+)
+
+func resolveHost(host string) string {
+	normalized := strings.TrimRight(strings.TrimSpace(host), "/")
+	switch strings.ToLower(normalized) {
+	case "", "prod", "production":
+		return HostProd
+	case "qa":
+		return HostQA
+	case "dev", "develop", "development":
+		return HostDev
+	}
+
+	switch strings.ToLower(normalized) {
+	case HostProd:
+		return HostProd
+	case HostQA:
+		return HostQA
+	case HostDev:
+		return HostDev
+	default:
+		fmt.Printf("Warning: unsupported host %q, want string prod/qa/dev or constant HostProd/HostQA/HostDev, fallback to HostProd", host)
+		return HostProd
+	}
+}
 
 var (
 	AuthorizationHasExpiredOrInvalid = errors.New("authorization has expired or invalid")
@@ -137,11 +171,13 @@ type OauthService interface {
 //   - clientId     應用程序(客戶端) ID
 //   - clientSecret 應用秘鑰，在具體應用的 `客戶端憑據` 裏創建客戶端密碼，注意有輪轉有效期
 //   - redirectUri  在具體應用的 客戶端憑據 裏的 `重定向URI` 添加設置，支持多個
-func New(clientId, clientSecret, redirectUri string) OauthService {
+//   - host         環境切換：prod / qa / dev，或 HostProd / HostQA / HostDev；空值默認 prod。傳域名時僅允許這三個 Host
+func New(clientId, clientSecret, redirectUri, host string) OauthService {
 	return &oauthService{
 		clientID:     clientId,
 		clientSecret: clientSecret,
 		redirectUri:  redirectUri,
+		host:         resolveHost(host),
 		httpClient: newClient(&http.Client{
 			Timeout: 10 * time.Second,
 			Transport: &http.Transport{
@@ -161,6 +197,11 @@ type oauthService struct {
 	clientID     string // 應用編號
 	clientSecret string // 應用秘鑰
 	redirectUri  string // OAuth應用創建時填寫的回調callback URL，也是oauth授權後跳回我們系統接收code、state的URL
+	host         string // API Host，如 https://api.tvbgo.tvb.com
+}
+
+func (o *oauthService) apiURL(path string) string {
+	return o.host + path
 }
 
 // GenerateRedirectURL generate TvbGo oauth login redirect URL
@@ -173,7 +214,7 @@ func (o *oauthService) GenerateRedirectURL(ctx context.Context, state string) st
 	param.Set("scope", "scan_login")
 	param.Set("state", state)
 
-	return fmt.Sprintf("https://api.tvbgo.tvb.com/connect/qrconnect?%s", param.Encode())
+	return o.apiURL("/connect/qrconnect") + "?" + param.Encode()
 }
 
 // Code2accessToken TvbGo oauth login callback code to token
@@ -221,7 +262,7 @@ func (o *oauthService) TvbGoCode2accessToken(ctx context.Context, code string) (
 	param.Set("grant_type", "authorization_code")
 	param.Set("redirect_uri", o.redirectUri)
 
-	return o.exchangeToken(ctx, "https://api.tvbgo.tvb.com/connect/oauth/access_token", param)
+	return o.exchangeToken(ctx, o.apiURL("/connect/oauth/access_token"), param)
 }
 
 // TvbGoRefreshAccessToken use refresh token refresh accessToken
@@ -233,7 +274,7 @@ func (o *oauthService) TvbGoRefreshAccessToken(ctx context.Context, refreshToken
 	param.Set("grant_type", "refresh_token")
 	param.Set("redirect_uri", o.redirectUri)
 
-	return o.exchangeToken(ctx, "https://api.tvbgo.tvb.com/connect/oauth/refresh_token", param)
+	return o.exchangeToken(ctx, o.apiURL("/connect/oauth/refresh_token"), param)
 }
 
 func (o *oauthService) exchangeToken(ctx context.Context, endpoint string, param url.Values) (TvbGoAccessToken, *OauthError) {
@@ -265,7 +306,7 @@ func (o *oauthService) TvbGoAccessToken2UserInfo(ctx context.Context, accessToke
 		"Authorization": "Bearer " + accessToken,
 	}
 
-	result, err := o.httpClient.Get(ctx, "https://api.tvbgo.tvb.com/connect/userinfo", nil, head)
+	result, err := o.httpClient.Get(ctx, o.apiURL("/connect/userinfo"), nil, head)
 	if oauthErr := oauthErrorFromResult(result, err); oauthErr != nil {
 		if oauthErr.StatusCode == http.StatusUnauthorized {
 			oauthErr.cause = AuthorizationHasExpiredOrInvalid
