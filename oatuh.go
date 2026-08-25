@@ -307,7 +307,7 @@ func (o *oauthService) TvbGoAccessToken2UserInfo(ctx context.Context, accessToke
 		"Authorization": "Bearer " + accessToken,
 	}
 
-	result, err := o.httpClient.Get(ctx, o.apiURL("/connect/userinfo"), nil, head)
+	result, err := o.httpClient.Get(ctx, o.apiURL("/connect/oauth/userinfo"), nil, head)
 	if oauthErr := oauthErrorFromResult(result, err); oauthErr != nil {
 		if oauthErr.StatusCode == http.StatusUnauthorized {
 			oauthErr.cause = AuthorizationHasExpiredOrInvalid
