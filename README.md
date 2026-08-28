@@ -55,7 +55,7 @@ func newOauth() tvbgo.OauthService {
 func login(w http.ResponseWriter, r *http.Request) {
 	oauth := newOauth()
 	state := "random-csrf-token" // 請自行生成並寫入 session / cookie
-	redirectURL := oauth.GenerateRedirectURL(r.Context(), state)
+	redirectURL := oauth.GenerateRedirectURL(r.Context(), state, tvbgo.LangSC)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 ```

@@ -18,6 +18,10 @@ const (
 	HostQA = "https://qa-api.tvbgo.tvb.com"
 	// HostDev 開發環境
 	HostDev = "https://mytvb.tvb-sz.com"
+	// LangSC 掃碼界面顯示繁體中文，默认
+	LangSC = "zh-HK"
+	// LangEN 扫码界面显示英文
+	LangEN = "en"
 )
 
 func resolveHost(host string) string {
@@ -156,7 +160,8 @@ type TvbGoUserInfo struct {
 type OauthService interface {
 	// GenerateRedirectURL 生成301跳轉到TvbGo的URL
 	//  - state 跳轉去oauth授權後原樣帶回的任意字符串（128字符以內）
-	GenerateRedirectURL(ctx context.Context, state string) string
+	//  - lang  掃碼界面文字語言，取值字符串en、zh-HK，或使用包常量LangSC、LangEN
+	GenerateRedirectURL(ctx context.Context, state, lang string) string
 	// Code2accessToken TvbGo授權後回調callback回後使用code去換令牌，請務必同時取出state進行比對後再調用本方法
 	//  - code  回到callback URL後從query-string裏取出的code值
 	Code2accessToken(ctx context.Context, code string) (TvbGoAccessToken, *OauthError)
@@ -207,13 +212,19 @@ func (o *oauthService) apiURL(path string) string {
 
 // GenerateRedirectURL generate TvbGo oauth login redirect URL
 //   - state 跳轉去oauth授權後原樣帶回的任意字符串（128字符以內），Code2accessToken之前需自主比對
-func (o *oauthService) GenerateRedirectURL(ctx context.Context, state string) string {
+//   - lang  掃碼界面文字語言，取值字符串en、zh-HK，或使用包常量LangSC、LangEN
+func (o *oauthService) GenerateRedirectURL(ctx context.Context, state, lang string) string {
 	param := make(url.Values)
 	param.Set("client_id", o.clientID)
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", o.redirectUri)
 	param.Set("scope", "scan_login")
 	param.Set("state", state)
+	if lang == LangEN {
+		param.Set("lang", LangEN)
+	} else {
+		param.Set("lang", LangSC)
+	}
 
 	return o.apiURL("/connect/qrconnect") + "?" + param.Encode()
 }
